@@ -103,9 +103,7 @@ class KokoroTTSEngine:
 def _resolve_cache_dir() -> Path | None:
     """Determina diretório padrão de cache respeitando variáveis de ambiente."""
     value = os.environ.get("KOKORO_CACHE_DIR") or os.environ.get("HF_HOME")
-    if not value:
-        return None
-    return Path(value).expanduser()
+    return None if not value else Path(value).expanduser()
 
 
 def _boolean_env(name: str, default: bool) -> bool:
