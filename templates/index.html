@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>openPDF2Voice — Leitor de PDF com IA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <header>
+      <h1>openPDF2Voice</h1>
+      <p>Converta documentos PDF em áudio natural utilizando o modelo Kokoro, totalmente offline.</p>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Enviar PDF</h2>
+        <form method="post" enctype="multipart/form-data">
+          <label class="field">
+            <span>Arquivo PDF</span>
+            <input type="file" name="pdf_file" accept="application/pdf" required />
+          </label>
+
+          <label class="field">
+            <span>Voz</span>
+            <select name="voice_id" required>
+              {% for voice in voices %}
+              <option value="{{ voice.id }}" {% if voice.id == (selected_voice or default_voice) %}selected{% endif %}>
+                {{ voice.label }}
+              </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <button type="submit">Gerar áudio</button>
+        </form>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <section class="messages">
+        {% for category, message in messages %}
+        <div class="message {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </section>
+      {% endif %}
+      {% endwith %}
+
+      {% if audio_filename %}
+      <section class="card">
+        <h2>Pré-visualização</h2>
+        <audio controls preload="metadata" src="{{ url_for('serve_audio', filename=audio_filename) }}"></audio>
+        <p>
+          <a class="download" href="{{ url_for('serve_audio', filename=audio_filename) }}" download>
+            Baixar arquivo WAV
+          </a>
+        </p>
+      </section>
+      {% endif %}
+    </main>
+
+    <footer>
+      <p>
+        Aplicação local e open source. Para interface desktop utilize <code>python app.py</code>.
+      </p>
+    </footer>
+  </body>
+</html>
