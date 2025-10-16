@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    image: openpdf2voice:latest
+    container_name: openpdf2voice
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./models:/models
+    environment:
+      - HF_HOME=/models
+      - KOKORO_CACHE_DIR=/models
+    command: ["python", "web_app.py", "--host", "0.0.0.0", "--port", "7860"]

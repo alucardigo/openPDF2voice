@@ -1,0 +1,6 @@
+numpy
+sounddevice
+pypdf
+transformers
+torch
+flask
