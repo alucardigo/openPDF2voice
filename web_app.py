@@ -57,7 +57,12 @@ def create_app() -> Flask:
         if not chunks or sample_rate is None:
             raise RuntimeError("Nenhum áudio foi gerado pelo modelo.")
 
-        audio = np.concatenate(chunks)
+        # Filter out empty arrays
+        non_empty_chunks = [chunk for chunk in chunks if chunk.size > 0]
+        if not non_empty_chunks:
+            raise RuntimeError("Nenhum áudio foi gerado pelo modelo.")
+
+        audio = np.concatenate(non_empty_chunks)
         audio = np.clip(audio, -1.0, 1.0)
         pcm16 = (audio * 32767).astype(np.int16)
 
