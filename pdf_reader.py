@@ -19,7 +19,10 @@ def extract_text_from_pdf(path: Path) -> str:
     reader = PdfReader(str(path))
     pages = []
     for page in reader.pages:
-        text = page.extract_text() or ""
+        try:
+            text = page.extract_text() or ""
+        except Exception:
+            text = ""
         pages.append(text)
 
     content = "\n".join(pages).strip()
