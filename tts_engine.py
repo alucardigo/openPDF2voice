@@ -10,7 +10,7 @@ from typing import Iterable, List
 try:
     import numpy as np
     import torch
-    from transformers import AutoModelForTextToWaveform, AutoProcessor
+    from transformers import AutoConfig, AutoModelForTextToWaveform, AutoProcessor
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError(
         "Instale as dependências de IA com `pip install transformers torch numpy`."
@@ -21,6 +21,19 @@ except ImportError as exc:  # pragma: no cover
 class KokoroVoice:
     id: str
     label: str
+
+
+def _resolve_cache_dir() -> Path | None:
+    """Determina diretório padrão de cache respeitando variáveis de ambiente."""
+    value = os.environ.get("KOKORO_CACHE_DIR") or os.environ.get("HF_HOME")
+    return Path(value).expanduser() if value else None
+
+
+def _boolean_env(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y"}
 
 
 class KokoroTTSEngine:
@@ -37,16 +50,42 @@ class KokoroTTSEngine:
         self.model_name = env_model or model_name
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.cache_dir = Path(cache_dir).expanduser() if cache_dir else _resolve_cache_dir()
-        self.local_files_only = _boolean_env("KOKORO_OFFLINE", False) if local_files_only is None else local_files_only
+        self.local_files_only = (
+            _boolean_env("KOKORO_OFFLINE", False) if local_files_only is None else local_files_only
+        )
 
         load_kwargs: dict[str, object] = {}
         if self.cache_dir:
             load_kwargs["cache_dir"] = str(self.cache_dir)
         if self.local_files_only:
             load_kwargs["local_files_only"] = True
+        load_kwargs["trust_remote_code"] = _boolean_env("KOKORO_TRUST_REMOTE_CODE", True)
+
+        config = None
+        try:
+            config = AutoConfig.from_pretrained(self.model_name, **load_kwargs)
+        except ValueError as exc:
+            if not load_kwargs.get("trust_remote_code", False):
+                raise
+            # Alguns modelos baseados em código remoto (como Kokoro) não incluem
+            # a chave ``model_type`` no config.json. O AutoModel é capaz de
+            # carregar o config personalizado quando ``trust_remote_code`` está
+            # habilitado, então seguimos sem instanciar o AutoConfig manualmente.
+            print(
+                "Aviso: não foi possível carregar AutoConfig; continuando com o "
+                "configuração embutida do modelo (detalhes: %s)" % exc,
+            )
 
         self.processor = AutoProcessor.from_pretrained(self.model_name, **load_kwargs)
-        self.model = AutoModelForTextToWaveform.from_pretrained(self.model_name, **load_kwargs)
+
+        model_kwargs = dict(load_kwargs)
+        if config is not None:
+            model_kwargs["config"] = config
+
+        self.model = AutoModelForTextToWaveform.from_pretrained(
+            self.model_name,
+            **model_kwargs,
+        )
         self.model.to(self.device)
 
         self.voices: List[KokoroVoice] = self._load_voices()
@@ -98,16 +137,3 @@ class KokoroTTSEngine:
             audio = waveform[0].cpu().numpy().astype(np.float32)
             sample_rate = getattr(self.model.config, "sampling_rate", 24000)
             yield sample_rate, audio.tobytes()
-
-
-def _resolve_cache_dir() -> Path | None:
-    """Determina diretório padrão de cache respeitando variáveis de ambiente."""
-    value = os.environ.get("KOKORO_CACHE_DIR") or os.environ.get("HF_HOME")
-    return None if not value else Path(value).expanduser()
-
-
-def _boolean_env(name: str, default: bool) -> bool:
-    value = os.environ.get(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "y"}

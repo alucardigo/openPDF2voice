@@ -5,7 +5,7 @@ import argparse
 import os
 from pathlib import Path
 
-from transformers import AutoModelForTextToWaveform, AutoProcessor
+from transformers import AutoConfig, AutoModelForTextToWaveform, AutoProcessor
 
 
 def _boolean_env(value: str | None, default: bool = False) -> bool:
@@ -21,14 +21,37 @@ def download(model_name: str, cache_dir: Path | None, local_files_only: bool) ->
         cache_dir.mkdir(parents=True, exist_ok=True)
         kwargs["cache_dir"] = str(cache_dir)
 
+    trust_remote_code = _boolean_env(os.environ.get("KOKORO_TRUST_REMOTE_CODE"), default=True)
+    kwargs["trust_remote_code"] = trust_remote_code
+
+    config = None
+    print(f"Baixando configuração de {model_name}...")
+    try:
+        config = AutoConfig.from_pretrained(
+            model_name,
+            local_files_only=local_files_only,
+            **kwargs,
+        )
+    except Exception as exc:
+        if not trust_remote_code:
+            raise
+        print(
+            "Aviso: não foi possível carregar AutoConfig. Continuando com o "
+            "config padrão do modelo (detalhes: %s)" % exc,
+        )
+
     print(f"Baixando processor de {model_name}...")
     AutoProcessor.from_pretrained(model_name, local_files_only=local_files_only, **kwargs)
 
     print(f"Baixando modelo de {model_name}...")
+    model_kwargs = dict(kwargs)
+    if config is not None:
+        model_kwargs["config"] = config
+
     AutoModelForTextToWaveform.from_pretrained(
         model_name,
         local_files_only=local_files_only,
-        **kwargs,
+        **model_kwargs,
     )
 
     print("Download concluído.")
