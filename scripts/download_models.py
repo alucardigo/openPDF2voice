@@ -32,7 +32,7 @@ def download(model_name: str, cache_dir: Path | None, local_files_only: bool) ->
             local_files_only=local_files_only,
             **kwargs,
         )
-    except ValueError as exc:
+    except Exception as exc:
         if not trust_remote_code:
             raise
         print(
